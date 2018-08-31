@@ -145,3 +145,166 @@ def CheckArgv(argv):
             return None
         else:
             return x['XH'], x['SFZH']
+
+# 定义查询课程列表的函数
+def GetCourseList(URL, TaskType, Cookie):
+    # 选课页面的查询字符串
+    SelectParams = {
+        'Action':'GetTeachTask',
+        'taskType': TaskType, # 01:计划课 02:选修课 03:补课 04:跨专业选课 (GET)
+        'rnd':'0.7902151354983268', # 随机数
+        'pageIndex':'0', 
+        'pageSize':'300'
+    }
+
+    # 课程查询
+    req = requests.get(URL, cookies = Cookie, params = SelectParams)
+    #print(Course.json())
+    try:
+        ReqCourse = req.json()
+    except:
+        print('解析出错!')
+    Course = ReqCourse['TeachTaskEntities']
+    CourseList = []
+
+    for i in range(len(Course)):
+        # 筛出待选课程
+        if Course[i]['IsSelectCourse'] == False:
+            CourseList.append(Course[i])
+
+    for i in range(len(CourseList)):
+        print(
+            str(i+1), CourseList[i]['CourseName'] + "(%s)  " %(CourseList[i]['Id']),
+            CourseList[i]['TeacherName'], 
+            '  剩余:', 
+            str(CourseList[i]['MaxStuNum'] - CourseList[i]['StuNum'])
+        )
+    t = input('请输入要选的课程序号:')
+    print(
+        '\n确定要选?  ', 
+        CourseList[int(t)-1]['CourseName'] + "(%s)  " %(CourseList[int(t)-1]['Id']), 
+        CourseList[int(t)-1]['TeacherName'],
+        '  剩余:', 
+        str(CourseList[int(t)-1]['MaxStuNum'] - CourseList[int(t)-1]['StuNum'])
+    )
+
+    key = input()
+
+    if key == '':
+        return CourseList[int(t)-1]['Id']
+
+
+#CheckCourse('01', AaoCookie)
+
+# 定义选课的函数
+def SelectCourse(URL, Cookie, ClassId, SclassId, TaskId, TaskType, JclassId):
+    Params = {
+        'Action':'SelectCourse',
+        'TaskType': TaskType, # 课程类型 01:计划课 02:选修课 03:补课 04:跨专业选课
+        'TaskId':TaskId, # 课程Id
+        'ClassId': ClassId, # 实验教学班Id ClassMode=01
+        'ClassId2':'0',
+        'ClassId3':'0',
+        'SclassId': SclassId, # 课堂教学班Id ClassMode=02
+        'SclassId2':'0',
+        'SclassId3':'0',
+        'oclassId':'0', # 暂时没看到这样的Id ClassMode=04
+        'oclassId2':'0',
+        'oclassId3':'0',
+        'jclassId': JclassId, # 实践教学班Id ClassMode=03
+        'jclassId2':'0',
+        'jclassId3':'0',
+        'oType':'04'
+    }
+    # 选课
+    XK = requests.post(URL, cookies = Cookie, params = Params)
+    print(XK.json())
+
+
+# 定义退课的函数
+def ExitCourse(URL, Cookie, TaskId, TaskType):
+    Params = {
+        'Action':'ExitSelectCourse',
+        'TaskType': TaskType, # 01:计划课 02:选修课 03:补课 04:跨专业选课 05:全校开设所有课程
+        'TaskId':TaskId
+    }
+
+    # 退课
+    TK = requests.post(URL, cookies = Cookie, params = Params)
+    print(TK.json())
+
+
+
+# 定义查看课程详情的函数
+# 查询课程信息,以列表形式返回各参数值
+def ViewCourse(URL, Cookie, TaskId, TaskType):
+    Params = {
+        'Action':'GetTeachTaskClass',
+        'TaskType': TaskType, # 01:计划课 02:选修课 03:补课 04:跨专业选课
+        'TaskId':TaskId,
+        'pageIndex':'1',
+        'pageSize':'100'
+
+    }
+
+    # 查看课程
+    '''
+    课程详情的json为一个有两个key的字典:
+        "data":{}  为课程详情,存放课程,班级
+        "TaskId":xxxxxx 课程Id
+    课程分多种: 
+        1. 单项(data中只含"02"的列表)
+        2. 含实验课(data项中还有"01"的列表) 01为实验教学班,02为课堂教学班
+        3. 多班(data中"02"的列表含有多个班级)
+    '''
+    VK = requests.post(URL, cookies = Cookie, params = Params)
+    try:
+        ReqCourse = VK.json()
+    except:
+        print('解析出错!')
+    Course = ReqCourse['data']
+
+    # 选课函数需要的参数
+    SelectValue = {
+        'ClassId':'0',
+        'SclassId':'0',
+        'jclassId':'0',
+        'oclassId':'0'
+    }
+    ClassList = []
+    
+    for key in Course:
+        # 判断多班级的情况
+        if len(Course['%s' %key]) > 1:
+            for i in range(len(Course['%s' %key])):
+                ClassList.append(Course['%s' %key][i])
+
+            for x in range(len(ClassList)):
+                print(
+                    str(x+1),
+                    ClassList[x]['TeachNames']
+                )
+            t = input('输入要选择的班级:')
+
+            if ClassList[int(t)-1]['ClassMode'] == '01':  
+                SelectValue['ClassId'] = ClassList[int(t)-1]['Id']
+            elif ClassList[int(t)-1]['ClassMode'] == '02':  
+                SelectValue['SclassId'] = ClassList[int(t)-1]['Id']
+            elif ClassList[int(t)-1]['ClassMode'] == '03':  
+                SelectValue['jclassId'] = ClassList[int(t)-1]['Id']
+            elif ClassList[int(t)-1]['ClassMode'] == '04':  
+                SelectValue['oclassId'] = ClassList[int(t)-1]['Id']
+
+            # return ClassList[int(t)-1]['ClassMode'], ClassList[int(t)-1]['Id']
+        # 其他情况统一处理
+        else:
+            for i in range(len(Course['%s' %key])):
+                if Course['%s' %key][i]['ClassMode'] == '01':  
+                    SelectValue['ClassId'] = Course['%s' %key][i]['Id']
+                elif Course['%s' %key][i]['ClassMode'] == '02':  
+                    SelectValue['SclassId'] = Course['%s' %key][i]['Id']
+                elif Course['%s' %key][i]['ClassMode'] == '03':  
+                    SelectValue['jclassId'] = Course['%s' %key][i]['Id']
+                elif Course['%s' %key][i]['ClassMode'] == '04':  
+                    SelectValue['oclassId'] = Course['%s' %key][i]['Id']
+    return SelectValue
