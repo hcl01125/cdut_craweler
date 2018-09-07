@@ -3,6 +3,7 @@
 # TODO: 1. 从学籍表中查询账号密码，登录教务处
 # TODO: 2. 查询成绩、班级等各项信息，并解析保存
 # TODO: 3. 登录学籍管理，查询家庭住址等其他信息，并解析保存
+# TODO: 4. 综合排版所有信息，输出成 word 或 pdf
 
 import requests
 import hashlib
@@ -23,9 +24,10 @@ def GetCookie(url, postdata, header):
     x = ss.post(url, data=postdata, headers = header, allow_redirects = False)
     return x.cookies
 
+
 # 定义从csv文件中查找账号密码的函数
 def SearchFromCsv(Flag, KeyWords):
-    with open('user.csv','r') as csvfile:
+    with open('/root/文档/cdut_crawel/学籍表.csv','r') as csvfile:
         reader = csv.DictReader(csvfile)
         if Flag == 'XM':
             ReturnList = []  # 查询姓名时，判断重名的情况
@@ -44,9 +46,12 @@ def SearchFromCsv(Flag, KeyWords):
         else:
             return False
 
-# 定义解析成绩单页面的函数 (attr：成绩单页面第一次请求时的object值， requ：beautifulSoup对象)
-def AnalyzeScore(attr,requ):
+# 定义解析成绩单页面的函数 
+# (attr：成绩单页面第一次请求时的object值, requ：beautifulSoup对象(用于解析科目成绩), requ2：用于解析绩点等信息)
+# fix: 添加requ2，专门解析绩点相关信息
+def AnalyzeScore(attr,requ,requ2):
     Soup = BeautifulSoup(requ.content, "html.parser")
+    Soup2 = BeautifulSoup(requ2.content, "html.parser") # Soup2专门用于解析绩点等信息
     
     # 先用正则表达式搜索学期那一栏的class值
     SemesterObject = re.search(r'\w\w">20\w\w0\w<', requ.text).group()
@@ -58,12 +63,13 @@ def AnalyzeScore(attr,requ):
     semester = [] # 保存学期列表
 
     # 获取姓名绩点等信息
-    TagName = Soup.find_all(name='td')
+    TagName = Soup2.find_all(name='td')
     FindKey = ['学  院', '学  号', '专业（层次）', '姓  名', '课程数', '平均成绩', '总学分', '平均学分绩点']
     for k in FindKey:
         for td in TagName:
             if td.getText() == k:
                 Score[td.getText()] = td.find_next("td").getText()
+    
     ScoreList.append(Score.copy())
     Score.clear()
 

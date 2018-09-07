@@ -3,6 +3,7 @@
 # TODO: 1. 从学籍表中查询账号密码，登录教务处
 # TODO: 2. 查询成绩、班级等各项信息，并解析保存
 # TODO: 3. 登录学籍管理，查询家庭住址等其他信息，并解析保存
+# TODO: 4. 综合排版所有信息，输出成 word 或 pdf
 
 import requests
 import time
@@ -11,7 +12,7 @@ import re
 import LoginFunction
 
 # 账号密码
-Stunum = '201601010101'
+Stunum = '201408020103'
 StuPass = LoginFunction.SearchFromCsv('XH', Stunum)['SFZH'] # 查询学籍表，获得身份证号
 
 # 默认查询自己的信息，带参数时为他人信息
@@ -32,7 +33,8 @@ if len(sys.argv) == 2:
 TimeNow = int(round(time.time() * 1000))
 
 # 浏览器标志头
-CHROME_HEADERS = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.76 Safari/537.36'
+CHROME_HEADERS = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 \
+(KHTML, like Gecko) Chrome/56.0.2924.76 Safari/537.36'
 
 # POST地址
 # 登录页面的post地址
@@ -40,6 +42,7 @@ LOGIN_URL = 'http://202.115.133.173:805/Common/Handler/UserLogin.ashx'
 # 成绩单页面地址
 CjdUrl1 = 'http://202.115.133.173:805/rpt.aspx?rid=stucjd&stucode=' + str(Stunum)
 CjdUrl2 = 'http://202.115.133.173:805/FastReport.Export.axd?object=' # + str(object.group())
+CjdUrl3 = 'http://202.115.133.173:805/FastReport.Export.axd?next=1&object='
 
 
 # 登录请求头
@@ -70,7 +73,11 @@ CjdRequest1 = requests.get(CjdUrl1, cookies = AaoCookie)
 object = re.search(r'fr\w\w\w\w\w\w', CjdRequest1.text).group()
 
 CjdRequest2 = requests.get(CjdUrl2 + object, cookies = AaoCookie)
+
+# fix： 无论成绩单是否有第二页，都请求第二页的页面，并由第二页专门解析前面的绩点等信息
+CjdRequest3 = requests.get(CjdUrl3 + object, cookies = AaoCookie)
+
 #print(CjdRequest2.text)
 
 # 解析并输出成绩单
-LoginFunction.AnalyzeScore(object, CjdRequest2)
+LoginFunction.AnalyzeScore(object, CjdRequest2, CjdRequest3)
